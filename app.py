@@ -290,7 +290,7 @@ def page_data_sentiment():
 # Page: Feature Engineering
 
 def page_features():
-    st.title("⚙️ Feature Engineering")
+    st.title("Feature Engineering")
 
     df = load_features()
 
@@ -362,7 +362,7 @@ def page_features():
 
 def page_predictions():
 
-    st.title("🤖 Model Predictions — Actual vs Predicted")
+    st.title("Model Predictions — Actual vs Predicted")
 
     preds = load_predictions()
     metrics = load_metrics()
@@ -569,7 +569,7 @@ def page_predictions():
 
 def page_metrics():
 
-    st.title("📈 Metrics & Model Comparison")
+    st.title("Metrics & Model Comparison")
 
     metrics = load_metrics()
 
@@ -692,7 +692,7 @@ def page_metrics():
 # Page: Scenario Comparison
 def page_scenario_comparison():
 
-    st.title("📊 Scenario Comparison")
+    st.title("Scenario Comparison")
 
     metrics = load_metrics()
 
