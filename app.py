@@ -1,5 +1,5 @@
 """
-BTC Price Prediction Dashboard — Streamlit App
+Bitcoin Price Forecasting Dashboard — Streamlit App
 Berbasis data CoinGecko + sentimen Twitter (HuggingFace dataset) + ML (LR / RF / LSTM).
 
 Cara pakai:
@@ -95,7 +95,7 @@ def load_feature_cols():
 
 # Sidebar — global controls
 
-st.sidebar.title("₿ Bitcoin Price Forecastin")
+st.sidebar.title("₿ Bitcoin Price Forecasting")
 st.sidebar.caption("Bitcoin price forecast — ML + sentiment Twitter")
 
 page = st.sidebar.radio(
@@ -130,7 +130,7 @@ st.sidebar.caption("Built with Streamlit · Data: CoinGecko + HuggingFace")
 # Page: Overview
 
 def page_overview():
-    st.title("₿ BTC Price Prediction Dashboard")
+    st.title("₿ Bitcoin Price Forecasting Dashboard")
     st.markdown(
     "Menganalisis forecasting harga **Bitcoin** menggunakan tiga skenario data: "
     "**Historical**, **Sentiment**, dan **Historical + Sentiment** "
