@@ -572,13 +572,18 @@ def page_metrics():
 
     metrics = load_metrics()
 
-    scenario = st.selectbox(
+    scenarios_pick = st.multiselect(
         "Scenario",
-        ["Historical", "Sentiment", "Combined"]
+        ["Historical", "Sentiment", "Combined"],
+        default=["Historical", "Sentiment", "Combined"]
     )
 
+    if not scenarios_pick:
+        st.warning("Pilih minimal satu skenario.")
+        return
+
     metrics = metrics[
-        metrics["scenario"] == scenario
+        metrics["scenario"].isin(scenarios_pick)
     ]
 
     st.subheader("Tabel Lengkap (RMSE / MAE / MAPE)")
@@ -599,9 +604,15 @@ def page_metrics():
 
     st.subheader("Visual Perbandingan")
 
-    metric = st.radio(
+    col_m, col_s = st.columns(2)
+    metric = col_m.radio(
         "Metric",
         ["RMSE", "MAE", "MAPE"],
+        horizontal=True
+    )
+    split_pick = col_s.radio(
+        "Split",
+        ["test", "validation"],
         horizontal=True
     )
 
@@ -610,20 +621,22 @@ def page_metrics():
     for i, h in enumerate(["t+1", "t+30"]):
 
         sub = metrics[
-            metrics["horizon"] == h
+            (metrics["horizon"] == h) &
+            (metrics["split"] == split_pick)
         ]
 
         fig = px.bar(
             sub,
             x="model",
             y=metric,
-            color="split",
+            color="scenario",
             barmode="group",
             color_discrete_map={
-                "validation": "#1f77b4",
-                "test": "#d62728"
+                "Historical": "#f7931a",
+                "Sentiment": "#9467bd",
+                "Combined": "#17becf",
             },
-            title=f"{scenario} | Horizon {h}"
+            title=f"Horizon {h} — {metric} per Model & Skenario"
         )
 
         fig.update_layout(
@@ -651,21 +664,21 @@ def page_metrics():
     st.divider()
 
     st.subheader(
-        "Best Model per Horizon (Test RMSE)"
+        "Best Model per Skenario & Horizon (Test RMSE)"
     )
 
     best = (
-    metrics[
-        metrics["split"] == "test"
-    ]
-    .sort_values(
-        ["horizon", "RMSE"]
-    )
-    .groupby(
-        ["horizon"]
-    )
-    .head(1)
-    .reset_index(drop=True)
+        metrics[
+            metrics["split"] == "test"
+        ]
+        .sort_values(
+            ["scenario", "horizon", "RMSE"]
+        )
+        .groupby(
+            ["scenario", "horizon"]
+        )
+        .head(1)
+        .reset_index(drop=True)
     )
 
     st.dataframe(
@@ -692,97 +705,155 @@ def page_metrics():
 # Page: Scenario Comparison
 def page_scenario_comparison():
 
-    st.title("Scenario Comparison")
+    st.title("🔬 Scenario Comparison")
+    st.markdown(
+        "Bandingkan kontribusi masing-masing sumber data "
+        "(**Historical**, **Sentiment**, **Combined**) terhadap akurasi prediksi Bitcoin."
+    )
 
     metrics = load_metrics()
+    preds   = load_predictions()
 
-    metric = st.selectbox(
-        "Metric",
-        ["RMSE", "MAE", "MAPE"]
-    )
-
-    split = st.selectbox(
-        "Dataset",
-        ["test", "validation"],
-        index=0
-    )
+    c1, c2, c3 = st.columns(3)
+    metric  = c1.selectbox("Metric",  ["RMSE", "MAE", "MAPE"])
+    split   = c2.selectbox("Dataset", ["test", "validation"], index=0)
+    horizon = c3.selectbox("Horizon", ["t+1", "t+30"], index=0)
 
     sub = metrics[
-        metrics["split"] == split
+        (metrics["split"]   == split) &
+        (metrics["horizon"] == horizon)
     ]
 
-    st.subheader(
-        f"Perbandingan {metric} Antar Skenario"
-    )
+    # ── Bar chart perbandingan antar skenario ──────────────────────────────
+    st.subheader(f"Perbandingan {metric} Antar Skenario — Horizon {horizon} · {split.title()}")
 
     fig = px.bar(
         sub,
-        x="scenario",
+        x="model",
         y=metric,
-        color="model",
-        facet_col="horizon",
+        color="scenario",
         barmode="group",
-        title=f"{metric} Comparison"
+        color_discrete_map={
+            "Historical": "#f7931a",
+            "Sentiment":  "#9467bd",
+            "Combined":   "#17becf",
+        },
+        text_auto=".2f",
+        title=f"{metric} per Model & Skenario — Horizon {horizon} · {split.title()}"
     )
-
     fig.update_layout(
-        height=500
+        height=450,
+        margin=dict(l=10, r=10, t=50, b=10),
+        xaxis_title="Model",
+        yaxis_title=metric,
     )
+    st.plotly_chart(fig, use_container_width=True)
 
-    st.plotly_chart(
-        fig,
-        use_container_width=True
+    # ── Actual vs Predicted: 3 skenario dalam 1 chart ──────────────────────
+    st.subheader(f"Actual vs Predicted — Semua Skenario · Horizon {horizon} · {split.title()}")
+
+    model_pick = st.selectbox("Pilih Model", ["LinearRegression", "RandomForest", "LSTM"])
+
+    fig2 = go.Figure()
+    base = preds[
+        (preds["model"]   == model_pick) &
+        (preds["horizon"] == horizon) &
+        (preds["split"]   == split) &
+        (preds["scenario"] == "Historical")
+    ].sort_values("date")
+
+    if not base.empty:
+        fig2.add_trace(go.Scatter(
+            x=base["date"], y=base["y_true"],
+            mode="lines", name="Actual",
+            line=dict(color=ACTUAL_COLOR, width=2.2)
+        ))
+
+    sc_colors = {"Historical": "#f7931a", "Sentiment": "#9467bd", "Combined": "#17becf"}
+    for sc in ["Historical", "Sentiment", "Combined"]:
+        sc_sub = preds[
+            (preds["scenario"] == sc) &
+            (preds["model"]    == model_pick) &
+            (preds["horizon"]  == horizon) &
+            (preds["split"]    == split)
+        ].sort_values("date")
+        if sc_sub.empty:
+            continue
+        fig2.add_trace(go.Scatter(
+            x=sc_sub["date"], y=sc_sub["y_pred"],
+            mode="lines", name=sc,
+            line=dict(color=sc_colors[sc], width=1.6),
+            opacity=0.85
+        ))
+
+    fig2.update_layout(
+        height=480,
+        xaxis_title="Tanggal", yaxis_title="BTC Close (USD)",
+        hovermode="x unified",
+        margin=dict(l=10, r=10, t=20, b=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
     )
+    st.plotly_chart(fig2, use_container_width=True)
 
-    st.subheader(
-        "Heatmap Performa"
-    )
-
+    # ── Heatmap ────────────────────────────────────────────────────────────
+    st.subheader(f"Heatmap {metric} — Semua Model vs Skenario")
     heat = (
-        sub
-        .pivot_table(
-            index="scenario",
-            columns=["horizon", "model"],
-            values=metric
-        )
+        sub.pivot_table(index="scenario", columns="model", values=metric)
         .round(2)
     )
+    fig3 = px.imshow(
+        heat, text_auto=".2f",
+        color_continuous_scale="RdYlGn_r",
+        title=f"Heatmap {metric} — Horizon {horizon} · {split.title()}",
+        aspect="auto",
+    )
+    fig3.update_layout(height=320, margin=dict(l=10, r=10, t=50, b=10))
+    st.plotly_chart(fig3, use_container_width=True)
 
+    # ── Tabel ringkasan ─────────────────────────────────────────────────────
+    st.subheader("Tabel Ringkasan")
     st.dataframe(
-        heat,
-        use_container_width=True
-    )
-
-    st.subheader(
-        "Best Result"
-    )
-
-    best = (
-        sub
+        sub[["scenario", "model", "RMSE", "MAE", "MAPE"]]
         .sort_values(metric)
-        .head(10)
+        .style.format({"RMSE": "{:.2f}", "MAE": "{:.2f}", "MAPE": "{:.2f}%"})
+               .highlight_min(subset=["RMSE", "MAE", "MAPE"], color="#d4edda"),
+        use_container_width=True, hide_index=True,
     )
 
-    best_row = sub.sort_values(metric).iloc[0]
+    # ── Insight otomatis ───────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Insight Otomatis")
+
+    best_overall = sub.sort_values(metric).iloc[0]
+    hist_best    = sub[sub["scenario"] == "Historical"].sort_values(metric).iloc[0]
+    sent_best    = sub[sub["scenario"] == "Sentiment"].sort_values(metric).iloc[0]
+    comb_best    = sub[sub["scenario"] == "Combined"].sort_values(metric).iloc[0]
+
+    improved  = comb_best[metric] < hist_best[metric]
+    diff_pct  = abs(comb_best[metric] - hist_best[metric]) / hist_best[metric] * 100
+    sent_weak = sent_best["MAPE"] > 20 if metric != "MAPE" else sent_best[metric] > 20
 
     st.success(
-    f"Best {metric}: "
-    f"{best_row['scenario']} | "
-    f"{best_row['model']} | "
-    f"{best_row['horizon']} "
-    f"({best_row[metric]:.2f})"
-)
-
-    st.dataframe(
-        best,
-        use_container_width=True,
-        hide_index=True
+        f"🏆 **Best overall (Horizon {horizon}, {split.title()}):** "
+        f"{best_overall['scenario']} — {best_overall['model']} "
+        f"({metric} = {best_overall[metric]:.2f})"
     )
-
+    if improved:
+        st.info(
+            f"✅ **Combined lebih baik dari Historical:** "
+            f"{metric} turun {diff_pct:.1f}% "
+            f"({hist_best[metric]:.2f} → {comb_best[metric]:.2f})"
+        )
+    else:
+        st.warning(
+            f"⚠️ **Combined tidak lebih baik dari Historical:** "
+            f"{metric} naik {diff_pct:.1f}% "
+            f"({hist_best[metric]:.2f} → {comb_best[metric]:.2f})"
+        )
     st.info(
-        "Halaman ini digunakan untuk membandingkan kontribusi "
-        "data Historical, Sentiment, dan Combined terhadap "
-        "akurasi prediksi Bitcoin."
+        f"📊 **Sentiment saja** — best model: {sent_best['model']} "
+        f"(MAPE = {sent_best['MAPE']:.2f}%). "
+        f"{'Sentimen saja tidak cukup untuk prediksi akurat.' if sent_weak else 'Sentimen saja menunjukkan kemampuan prediksi yang cukup.'}"
     )
 
 # Page: Conclusion
