@@ -207,7 +207,7 @@ def page_overview():
 # Page: Data & Sentiment
 
 def page_data_sentiment():
-    st.title("📊 Data Historis & Sentimen Twitter")
+    st.title(" Data Historis & Sentimen Twitter")
 
     btc = load_btc()
     sentiment = load_sentiment()
@@ -568,7 +568,7 @@ def page_predictions():
 # Page: Metrics
 def page_metrics():
 
-    st.title("📈 Metrics & Model Comparison")
+    st.title(" Metrics & Model Comparison")
 
     metrics = load_metrics()
 
@@ -705,7 +705,7 @@ def page_metrics():
 # Page: Scenario Comparison
 def page_scenario_comparison():
 
-    st.title("🔬 Scenario Comparison")
+    st.title(" Scenario Comparison")
     st.markdown(
         "Bandingkan kontribusi masing-masing sumber data "
         "(**Historical**, **Sentiment**, **Combined**) terhadap akurasi prediksi Bitcoin."
@@ -860,7 +860,7 @@ def page_scenario_comparison():
 
 def page_conclusion():
 
-    st.title("✅ Kesimpulan")
+    st.title(" Kesimpulan")
 
     st.markdown("""
 ### Kesimpulan
